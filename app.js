@@ -18,16 +18,19 @@ db.connect();
 
 
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.json());
 
 // Read 
-app.get("/", async(req,res)=>{
-  const list = await db.query("SELECT* FROM expensetracker")
-  try {
+app.get("/expense", async(req,res)=>{
 
-    res.render(list);
+  try {
+   
+    const list = await db.query("SELECT* FROM expenseTracker")
+    res.status(200).json(list.rows);
 
   } catch (error) {
     console.log("error" + error.message)
+    res.json({error: "something went wrong"});
   }
 });
 
@@ -37,20 +40,31 @@ app.post("/add", async(req,res)=>{
    const category = req.body.category;
    const expense = req.body.expense;
    
-    await db.query('INSERT INTO expensetracker VALUES($1, $2, $3)',
-    {
+   try {
+
+      const newItem = await db.query('INSERT INTO expensetracker (dates, category, expense) VALUES($1, $2, $3) RETURNING *',
+    [
        dates,
        category,
        expense
-    } 
+    ] 
+    
   )
-  res.redirect('/')
+  console.log(newItem.rows);
+  res.status(201).json(newItem.rows)
+
+   } catch (error) {
+    console.log("error"+ error.message);
+    res.status(500).json({error: "Failed to retrieve expenses"});
+   }
+
 });
 
 //Update 
-app.patch("/", async(req,res)=>{
-  //WE GOT A SERIOUS PROBLEM HERE.................................. 
-   await db.query("UPDATE expensetracker SET '''SELECTED = VALUE ENTERED''' WHERE ....")
+app.patch("/edit/:id", async(req,res)=>{
+   const id = req.params.id;
+  //  await db.query("UPDATE expensetracker SET '''SELECTED = VALUE ENTERED''' WHERE id = $1",[id])
+   console.log(typeof req.params.id);
   })
 
 //Delete
@@ -66,7 +80,7 @@ app.post('sign up', (req ,res)=>{
   const userName = req.body.userName;
 })
 
-client.end();
+
 
 app.listen(port, ()=>
    {console.log(`server is running on port ${port}`)
