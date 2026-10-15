@@ -30,7 +30,8 @@ app.get("/expense", async(req,res)=>{
 
   } catch (error) {
     console.log("error" + error.message)
-    res.json({error: "something went wrong"});
+    
+     res.status(500).json({error: "Failed to retrieve expenses"});
   }
 });
 
@@ -55,23 +56,45 @@ app.post("/add", async(req,res)=>{
 
    } catch (error) {
     console.log("error"+ error.message);
-    res.status(500).json({error: "Failed to retrieve expenses"});
+   res.json({error: "something went wrong"});
    }
 
 });
 
 //Update 
 app.patch("/edit/:id", async(req,res)=>{
-   const id = req.params.id;
-  //  await db.query("UPDATE expensetracker SET '''SELECTED = VALUE ENTERED''' WHERE id = $1",[id])
-   console.log(typeof req.params.id);
+  
+   const id = parseInt( req.params.id);
+  
+  try {
+
+       const updated = await db.query("UPDATE expensetracker SET dates=$1 , category=$2 , expense=$3 WHERE id = $4",
+        [req.body.dates, 
+        req.body.category,
+        req.body.expense,
+         id])
+ 
+      res.status(200).json({message:"expense has been successfully updated"})
+
+  } catch (error) {
+    console.log(error.message);
+     res.status(500).json({error: "something went wrong"});
+    
+  }
+
   })
 
 //Delete
-app.delete("/delete", async(req,res) =>{
+app.delete("/delete/:id", async(req,res) =>{
   const id = req.params.id;
- await db.query('DELETE FROM expensetracker WHERE id = $1',{id})
- res.redirect('/')
+  try {
+    await db.query('DELETE FROM expensetracker WHERE id = $1',[id])
+    res.status(200).json({message: "the expense has been deleted"})
+  } catch (error) {
+    res.status(500).json({error: "something went wrong"})
+  }
+ 
+
 });
 
 //Log in 
@@ -85,3 +108,13 @@ app.post('sign up', (req ,res)=>{
 app.listen(port, ()=>
    {console.log(`server is running on port ${port}`)
 });
+
+// req.body.password = encrypt(req.body.password); next();
+  
+  // try {
+  //    isNaN(req.params.id) === true;
+  //    const id = parseInt( req.params.id);
+
+  // } catch (error) {
+  //   res.status(400).json("wrong id")
+  // }
