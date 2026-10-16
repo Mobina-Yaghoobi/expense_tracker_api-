@@ -2,6 +2,7 @@ import express from "express";
 import bodyParser from "body-parser";
 import pg from "pg";
 import env from "dotenv";
+import bcrypt from "bcrypt";
 
 const port = 3000;
 const app = express();
@@ -97,11 +98,37 @@ app.delete("/delete/:id", async(req,res) =>{
 
 });
 
-//Log in 
-app.post('sign up', (req ,res)=>{
+//sign up 
+app.post('/signUp', async(req ,res)=>{
+  const saltRounds = 10;
   const password = req.body.password;
   const userName = req.body.userName;
-})
+  let hashed_password = "";
+ try {
+   
+  try {
+     hashed_password = await bcrypt.hash(password,saltRounds)
+  } catch (error) {
+    res.status(500).json({err: "there is a problem in password security process!"})
+    return;
+  }
+  
+
+   await db.query("INSERT INTO users (user_name, password_hashed) VALUES($1, $2)",
+  [userName, 
+   hashed_password
+  ]
+ )
+  res.status(200).json({message: " user has been succussfully signed up!"})
+
+ } catch (error) {
+
+  res.status(500).json({err: "oops! there was a problem signing up the user !"})
+ }
+
+ 
+});
+
 
 
 
@@ -109,12 +136,3 @@ app.listen(port, ()=>
    {console.log(`server is running on port ${port}`)
 });
 
-// req.body.password = encrypt(req.body.password); next();
-  
-  // try {
-  //    isNaN(req.params.id) === true;
-  //    const id = parseInt( req.params.id);
-
-  // } catch (error) {
-  //   res.status(400).json("wrong id")
-  // }
