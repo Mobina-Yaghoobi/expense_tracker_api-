@@ -129,6 +129,37 @@ app.post('/signUp', async(req ,res)=>{
  
 });
 
+//log In 
+app.post("/logIn", async (req, res)=>{
+const logIn_userName = req.body.userName;
+const logIn_password = req.body.password;
+
+try {
+
+  let result = await db.query ("SELECT password_hashed FROM users WHERE user_name = $1",
+  [logIn_userName])
+  console.log(typeof(result.rows[0].password_hashed))
+
+   try {
+
+     const comparision = await bcrypt.compare(logIn_password, result.rows[0].password_hashed)
+     if (comparision === true){
+         res.status(200).json({message: "user has been successfylly logged in "});
+     }
+     else{
+      res.status(400).json({err: "wrong password"})
+     }
+
+   } catch (error){
+    res.status(500).json({err: "something went wrong in password security"})
+   }
+
+
+} catch (error) {
+  res.status(400).json({message: "invalid user_name!"})
+}
+
+});
 
 
 
