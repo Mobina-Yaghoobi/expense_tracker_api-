@@ -3,6 +3,7 @@ import bodyParser from "body-parser";
 import pg from "pg";
 import env from "dotenv";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 
 const port = 3000;
 const app = express();
@@ -136,7 +137,7 @@ const logIn_password = req.body.password;
 
 try {
 
-  let result = await db.query ("SELECT password_hashed FROM users WHERE user_name = $1",
+  let result = await db.query ("SELECT id, password_hashed FROM users WHERE user_name = $1",
   [logIn_userName])
 
   if(result.rows[0] === undefined){
@@ -147,9 +148,21 @@ try {
 
 
      const comparision = await bcrypt.compare(logIn_password, result.rows[0].password_hashed)
-     if (comparision === true){
-         res.status(200).json({message: "user has been successfylly logged in "});
-         console.log("user has been successfylly logged in ")
+     if (comparision){
+        const userId = result.rows[0].id
+       
+          //signing JWT
+           const token = jwt.sign(
+           {user_Id: userId},
+           process.env.JWT_secret,
+           {expiresIn: 60 * 60})
+
+           res.status(200).json({token : token});
+           console.log(req.headers)
+
+           //verifying JWT
+           jwt.verify(token,process.env.JWT_secret,)
+        
      }
      else{
       res.status(400).json({err: "wrong password"})
