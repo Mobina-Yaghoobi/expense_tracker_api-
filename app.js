@@ -3,7 +3,7 @@ import bodyParser from "body-parser";
 import pg from "pg";
 import env from "dotenv";
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
+import jwt, { decode } from "jsonwebtoken";
 
 const port = 3000;
 const app = express();
@@ -19,15 +19,45 @@ const db = new pg.Client({
 db.connect();
 
 
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(express.json());
+ app.use(bodyParser.urlencoded({ extended: true }));
+ app.use(express.json());
+
+
+ // a middleware function 
+ function authenticateToken(req, res, next){
+  if(req.headers.authorization === undefined){
+    res.status(401).json({err: "athorization header is missing"})
+    return 
+  }
+  const [type, enteredToken] = req.headers.authorization.split(" ");
+  if(type !== "Bearer" || !enteredToken){
+    res.status(401).json({err: "invalid authorization format"})
+    return 
+  }
+  
+ jwt.verify(enteredToken, process.env.JWT_secret, (err, decode)=>{
+
+ if(err){
+
+  res.status(401).json({err : "wrong token!"})
+  return 
+
+ }else{
+  //decode ={ user_id: ... }
+  req.user = decode;
+  next();
+ }
+ })
+}
 
 // Read 
-app.get("/expense", async(req,res)=>{
+app.get("/expense", authenticateToken, async(req,res)=>{
 
   try {
    
-    const list = await db.query("SELECT* FROM expenseTracker")
+    const list = await db.query("SELECT* FROM expenseTracker WHERE user_id=$1",
+      [req.user.user_Id])
+
     res.status(200).json(list.rows);
 
   } catch (error) {
@@ -38,45 +68,53 @@ app.get("/expense", async(req,res)=>{
 });
 
 //Create 
-app.post("/add", async(req,res)=>{
+app.post("/add",authenticateToken, async(req,res)=>{
    const dates = req.body.dates;
    const category = req.body.category;
    const expense = req.body.expense;
    
    try {
 
-      const newItem = await db.query('INSERT INTO expensetracker (dates, category, expense) VALUES($1, $2, $3) RETURNING *',
+      const newItem = await db.query('INSERT INTO expensetracker (dates, category, expense,user_id) VALUES($1, $2, $3, $4) RETURNING *',
     [
        dates,
        category,
-       expense
+       expense,
+       req.user.user_Id
     ] 
     
   )
   console.log(newItem.rows);
-  res.status(201).json(newItem.rows)
+  res.status(201).json(newItem.rows[0])
 
    } catch (error) {
-    console.log("error"+ error.message);
-   res.json({error: "something went wrong"});
+    console.log("error: "+ error.message);
+   res.status(500).json({error: "something went wrong"});
    }
 
 });
 
 //Update 
-app.patch("/edit/:id", async(req,res)=>{
+app.patch("/edit/:id",authenticateToken, async(req,res)=>{
   
-   const id = parseInt( req.params.id);
+   const id = Number( req.params.id);
+   if(!Number.isInteger(id) || id <= 0){
+    return res.status(400).json({err: "bad request"})
+   }
   
   try {
 
-       const updated = await db.query("UPDATE expensetracker SET dates=$1 , category=$2 , expense=$3 WHERE id = $4",
+       const updated = await db.query("UPDATE expensetracker SET dates=$1 , category=$2 , expense=$3 WHERE id = $4 AND user_id=$5 RETURNING*",
         [req.body.dates, 
         req.body.category,
         req.body.expense,
-         id])
- 
-      res.status(200).json({message:"expense has been successfully updated"})
+        id,
+        req.user.user_Id
+         ])
+      if(updated.rowCount === 0){
+        return res.status(404).json({err: "expense not found"})
+      }
+      res.status(200).json(updated.rows[0])
 
   } catch (error) {
     console.log(error.message);
@@ -87,11 +125,21 @@ app.patch("/edit/:id", async(req,res)=>{
   })
 
 //Delete
-app.delete("/delete/:id", async(req,res) =>{
-  const id = req.params.id;
+app.delete("/delete/:id",authenticateToken, async(req,res) =>{
+    const id = Number( req.params.id);
+    if(!Number.isInteger(id) || id <= 0){
+    return res.status(400).json({err: "bad request"})
+   }
+
   try {
-    await db.query('DELETE FROM expensetracker WHERE id = $1',[id])
-    res.status(200).json({message: "the expense has been deleted"})
+    const deleted = await db.query('DELETE FROM expensetracker WHERE id = $1 AND user_id=$2',
+      [id,
+      req.user.user_Id]
+    );
+   if(deleted.rowCount === 0){
+    return res.status(404).json({err: "expense not found!"})
+   }
+    return res.status(200).json({message: "the expense has been deleted"})
   } catch (error) {
     res.status(500).json({error: "something went wrong"})
   }
@@ -158,11 +206,7 @@ try {
            {expiresIn: 60 * 60})
 
            res.status(200).json({token : token});
-           console.log(req.headers)
 
-           //verifying JWT
-           jwt.verify(token,process.env.JWT_secret,)
-        
      }
      else{
       res.status(400).json({err: "wrong password"})
