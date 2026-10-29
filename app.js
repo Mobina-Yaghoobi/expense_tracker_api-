@@ -9,6 +9,8 @@ const port = 3000;
 const app = express();
 env.config();
 
+
+
 const db = new pg.Client({
   user: process.env.DB_User,
   host:  process.env.DB_Host ,
@@ -50,14 +52,55 @@ db.connect();
  })
 }
 
-// Read 
+
+
+
+
+// Read  filtering     
 app.get("/expense", authenticateToken, async(req,res)=>{
+ let list;
+ //today's date
+ const today = new Date();
 
   try {
-   
-    const list = await db.query("SELECT* FROM expenseTracker WHERE user_id=$1",
-      [req.user.user_Id])
 
+  switch (req.query.filter) {
+    case "week":
+     var lastweek = new Date(today);
+    lastweek.setDate(today.getDate()-7)
+     list = await db.query("SELECT* FROM expenseTracker WHERE dates > $1  AND user_id=$2",
+        [lastweek, req.user.user_Id ])
+
+      break; 
+
+    case "month":
+       var lastMonth = new Date(today);
+       lastMonth.setMonth(lastMonth.getMonth()-1)
+       list = await db.query("SELECT* FROM expensetracker WHERE dates > $1 AND user_id=$2",
+        [lastMonth, req.user.user_Id])
+      break;
+
+    case "3months":
+       var last3Month = new Date(today);
+       last3Month.setMonth(last3Month.getMonth()-3)
+       list = await db.query("SELECT* FROM expensetracker WHERE dates > $1 AND user_id=$2",
+       [last3Month, req.user.user_Id])
+      break;
+
+    case "custom":
+      const startDate = //?
+      const endDate = // ?
+      list = await db.query("SELECT* FROM expenseTracker WHERE $1 <= dates AND dates <= $2 AND user_id=$3",
+      [ startDate,
+        endDate,
+        req.user.user_Id])
+      break;
+    default:
+        list = await db.query("SELECT* FROM expensetracker WHERE user_id=$1",
+        [req.user.user_Id])
+      break;
+  }
+     
     res.status(200).json(list.rows);
 
   } catch (error) {
@@ -65,6 +108,7 @@ app.get("/expense", authenticateToken, async(req,res)=>{
     
      res.status(500).json({error: "Failed to retrieve expenses"});
   }
+
 });
 
 //Create 
