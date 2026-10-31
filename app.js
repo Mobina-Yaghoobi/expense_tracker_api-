@@ -70,7 +70,7 @@ app.get("/expense", authenticateToken, async(req,res)=>{
     lastweek.setDate(today.getDate()-7)
      list = await db.query("SELECT* FROM expenseTracker WHERE dates > $1  AND user_id=$2",
         [lastweek, req.user.user_Id ])
-
+      console.log(req.query.filter)
       break; 
 
     case "month":
@@ -88,9 +88,36 @@ app.get("/expense", authenticateToken, async(req,res)=>{
       break;
 
     case "custom":
-      const startDate = //?
-      const endDate = // ?
-      list = await db.query("SELECT* FROM expenseTracker WHERE $1 <= dates AND dates <= $2 AND user_id=$3",
+      let startDate = req.query.startDate
+      let endDate = req.query.endDate
+      let start;
+      let end
+      
+       
+       //when the start date and end date is not included by user 
+       if(startDate ===undefined || endDate===undefined){
+          return res.status(400).json({err:"you should enter the start date and the end date!"})
+       }
+
+       //CHECK dates' format
+        let Dates = [startDate, endDate]
+
+       for(let date of Dates){
+         let peaces = date.split('-');
+         if(peaces.length != 3 || peaces[0].length != 4 || peaces[1].length != 2 || peaces[2].length != 2){
+            return res.status(400).json("wrong date format! (YYYY-MM-DD)")
+       }
+       }
+       
+
+
+       //when the start date is later than end point 
+        if(startDate > endDate){
+        return res.status(400).json({err:"first enter the start date!"})
+       }
+
+
+      list = await db.query("SELECT* FROM expenseTracker WHERE dates >= $1 AND dates <= $2 AND user_id=$3",
       [ startDate,
         endDate,
         req.user.user_Id])
@@ -98,7 +125,7 @@ app.get("/expense", authenticateToken, async(req,res)=>{
     default:
         list = await db.query("SELECT* FROM expensetracker WHERE user_id=$1",
         [req.user.user_Id])
-      break;
+      break; 
   }
      
     res.status(200).json(list.rows);
