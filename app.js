@@ -70,7 +70,6 @@ app.get("/expense", authenticateToken, async(req,res)=>{
     lastweek.setDate(today.getDate()-7)
      list = await db.query("SELECT* FROM expenseTracker WHERE dates > $1  AND user_id=$2",
         [lastweek, req.user.user_Id ])
-      console.log(req.query.filter)
       break; 
 
     case "month":
@@ -90,8 +89,8 @@ app.get("/expense", authenticateToken, async(req,res)=>{
     case "custom":
       let startDate = req.query.startDate
       let endDate = req.query.endDate
-      let start;
-      let end
+
+     
       
        
        //when the start date and end date is not included by user 
@@ -101,16 +100,15 @@ app.get("/expense", authenticateToken, async(req,res)=>{
 
        //CHECK dates' format
         let Dates = [startDate, endDate]
-
        for(let date of Dates){
+         let d = new Date(date)
          let peaces = date.split('-');
-         if(peaces.length != 3 || peaces[0].length != 4 || peaces[1].length != 2 || peaces[2].length != 2){
-            return res.status(400).json("wrong date format! (YYYY-MM-DD)")
+  
+         if(peaces.length != 3 || peaces[0].length != 4 || peaces[1].length != 2 || peaces[2].length != 2 || isNaN(d.getTime()) || d.getUTCFullYear() != Number(peaces[0]) || d.getUTCMonth()!= (Number(peaces[1]))-1 || d.getUTCDate() != Number(peaces[2])){
+          return res.status(400).json("wrong date format! (YYYY-MM-DD)")
        }
        }
-       
-
-
+   
        //when the start date is later than end point 
         if(startDate > endDate){
         return res.status(400).json({err:"first enter the start date!"})
@@ -143,7 +141,29 @@ app.post("/add",authenticateToken, async(req,res)=>{
    const dates = req.body.dates;
    const category = req.body.category;
    const expense = req.body.expense;
-   
+   if(dates ===undefined || category === undefined || expense === undefined || dates ===''|| category===''|| expense===''){
+     return res.status(400).json({err: "you must provide all the information!"})
+   }
+   let d = new Date(dates)
+   //invalid data type for dates and category
+   if(typeof dates!== "string" || typeof category !== "string"){
+    return res.status(400).json({err: "Invalid data type: dates and categoty must be strings"})
+   }
+   //whitespace-only handling 
+   if (dates.trim().length === 0 || category.trim().length=== 0 ){
+    return res.status(400).json({err: "invalid input : you must enter a string for dates and category"})
+   }
+
+// expense should be a valid number and not zero or negative
+   if(typeof expense !== "number"  || expense <= 0 || !Number.isFinite(expense)){
+   return res.status(400).json({err:"invalid expense "})
+   }
+  
+   let peaces = dates.split('-')
+   if(peaces.length != 3 || peaces[0].length != 4 || peaces[1].length != 2 || peaces[2].length != 2 || isNaN(d.getTime()) || d.getUTCFullYear() != Number(peaces[0]) || d.getUTCMonth()!= (Number(peaces[1]))-1 || d.getUTCDate() != Number(peaces[2])){
+      return res.status(400).json("wrong date format! (YYYY-MM-DD)")
+       }
+
    try {
 
       const newItem = await db.query('INSERT INTO expensetracker (dates, category, expense,user_id) VALUES($1, $2, $3, $4) RETURNING *',
@@ -155,7 +175,6 @@ app.post("/add",authenticateToken, async(req,res)=>{
     ] 
     
   )
-  console.log(newItem.rows);
   res.status(201).json(newItem.rows[0])
 
    } catch (error) {
@@ -188,7 +207,6 @@ app.patch("/edit/:id",authenticateToken, async(req,res)=>{
       res.status(200).json(updated.rows[0])
 
   } catch (error) {
-    console.log(error.message);
      res.status(500).json({error: "something went wrong"});
     
   }
@@ -239,7 +257,7 @@ app.post('/signUp', async(req ,res)=>{
    hashed_password
   ]
  )
-  res.status(200).json({message: " user has been succussfully signed up!"})
+  res.status(201).json({message: " user has been succussfully signed up!"})
 
  } catch (error) {
 
@@ -262,9 +280,6 @@ try {
   if(result.rows[0] === undefined){
     return res.status(400).json({err: "there is no such a username, register first!"})
   }
-
-  console.log(typeof(result.rows[0].password_hashed))
-
 
      const comparision = await bcrypt.compare(logIn_password, result.rows[0].password_hashed)
      if (comparision){
