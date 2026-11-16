@@ -190,17 +190,89 @@ app.patch("/edit/:id",authenticateToken, async(req,res)=>{
    const id = Number( req.params.id);
    if(!Number.isInteger(id) || id <= 0){
     return res.status(400).json({err: "bad request"})
-   }
-  
-  try {
+   } 
+       
+  try { 
+     
+        let update = []
+        let value = []
+        let items = ["dates", "category", "expense"]
+        if(Object.hasOwn(req.body, )){
+          return res.status(400).json({err: "nothing has been entered!"})
+        }
+        items.forEach(element => {
+           if(req.body[element] === null){
+            return res.status(400).json({err: "invalid input!"})
+          }  
+          if(Object.hasOwn(req.body, element)){
+           
+            update.push(element);
+            value.push(req.body[element]);
+      
+          }
 
-       const updated = await db.query("UPDATE expensetracker SET dates=$1 , category=$2 , expense=$3 WHERE id = $4 AND user_id=$5 RETURNING*",
-        [req.body.dates, 
-        req.body.category,
-        req.body.expense,
+        });
+
+        if(update.length === 0 ) {return res.status(400).json({err: "at least one field must be provided for an update"})}
+
+   //dates validation 
+        if(update.includes("dates")){
+
+          let index = update.indexOf('dates')
+          let datesValue = value[index];
+          
+          if(typeof datesValue !== 'string'){
+            return res.status(400).json({err: "invalid data type: you must enter a string for dates!"})
+          }
+
+          if (datesValue.trim().length === 0){
+            return res.status(400).json({err: "invalid input : you must enter a string for dates"})
+          }
+
+       let d = new Date(datesValue)
+       let peaces = datesValue.split('-')
+       if(peaces.length != 3 || peaces[0].length != 4 || peaces[1].length != 2 || peaces[2].length != 2 || isNaN(d.getTime()) || d.getUTCFullYear() != Number(peaces[0]) || d.getUTCMonth()!= (Number(peaces[1]))-1 || d.getUTCDate() != Number(peaces[2])){
+
+       return res.status(400).json("wrong date format! (YYYY-MM-DD)")
+       }
+        }
+    
+    //category validation 
+       if(update.includes('category')){
+
+        let index = update.indexOf('category');
+        let categoryValue = value[index];
+
+          if (typeof categoryValue !== 'string'){
+            return res.status(400).json({err: "invalid data type : you must enter a string for category"})
+        }
+
+        if(categoryValue.trim().length === 0){
+          return res.status(400).json({err: "invalid input : you must enter a string for category"})
+        }
+       }
+    
+   //expense validation 
+      if(update.includes("expense")){
+
+         let index = update.indexOf("expense");
+         let expenseValue = value[index];
+
+          if(typeof expenseValue !== "number" || expenseValue <= 0 || !Number.isFinite(expenseValue)){
+            return res.status(400).json({err: "invalid expense"})
+          }
+
+      }
+
+        let n = 1
+        let constructedQuery = `UPDATE expensetracker  SET ${update.map((element => `${element}=$${n++}`)).join(',')} WHERE id = $${(update.length)+1} AND user_id=$${(update.length)+ 2} RETURNING*`;
+       const updated = await db.query(constructedQuery,
+        [...value,
         id,
         req.user.user_Id
-         ])
+         ]);
+
+
       if(updated.rowCount === 0){
         return res.status(404).json({err: "expense not found"})
       }
