@@ -197,10 +197,10 @@ app.patch("/edit/:id",authenticateToken, async(req,res)=>{
         let update = []
         let value = []
         let items = ["dates", "category", "expense"]
-        if(Object.hasOwn(req.body, )){
+        if(Object.keys(req.body).length === 0){
           return res.status(400).json({err: "nothing has been entered!"})
         }
-        items.forEach(element => {
+        for(const element of items){
            if(req.body[element] === null){
             return res.status(400).json({err: "invalid input!"})
           }  
@@ -208,10 +208,9 @@ app.patch("/edit/:id",authenticateToken, async(req,res)=>{
            
             update.push(element);
             value.push(req.body[element]);
-      
           }
 
-        });
+        };
 
         if(update.length === 0 ) {return res.status(400).json({err: "at least one field must be provided for an update"})}
 
@@ -314,7 +313,25 @@ app.post('/signUp', async(req ,res)=>{
   const password = req.body.password;
   const userName = req.body.userName;
   let hashed_password = "";
- try {
+ try { 
+    ////////////////////////////////////////////
+    if(!Object.hasOwn(req.body, "password")){
+       return res.status(400).json({err:"you must enter a password!"})
+    }
+    if (typeof password !== "string"){
+       return res.status(400).json({err:"invalid data type: you must enter a string"})
+    }
+
+    if(password.trim().length === 0){
+       return res.status(400).json({err:"invalid input: you must enter a password"})
+    }
+    if(password.length < 8){
+       return res.status(400).json({err:"your password should be at least 8 charactors!"})
+    }
+    if(password.length > 128){
+       return res.status(400).json({err:"your password should be at 128 charactors at most!"})
+    }
+    ////////////////////////////////////////////
    
   try {
      hashed_password = await bcrypt.hash(password,saltRounds)
@@ -322,6 +339,7 @@ app.post('/signUp', async(req ,res)=>{
     res.status(500).json({err: "there is a problem in password security process!"})
     return;
   }
+  
   
 
    await db.query("INSERT INTO users (user_name, password_hashed) VALUES($1, $2)",
