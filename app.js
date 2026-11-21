@@ -27,7 +27,7 @@ db.connect();
 
  // a middleware function 
  function authenticateToken(req, res, next){
-  if(req.headers.authorization === undefined){
+  if((req.headers.authorization === undefined) || (req.headers.authorization === '')){
     res.status(401).json({err: "athorization header is missing"})
     return 
   }
@@ -315,11 +315,12 @@ app.post('/signUp', async(req ,res)=>{
   let hashed_password = "";
  try { 
     ////////////////////////////////////////////
+    //password validation 
     if(!Object.hasOwn(req.body, "password")){
        return res.status(400).json({err:"you must enter a password!"})
     }
     if (typeof password !== "string"){
-       return res.status(400).json({err:"invalid data type: you must enter a string"})
+       return res.status(400).json({err:"invalid data type: you must enter a string for password"})
     }
 
     if(password.trim().length === 0){
@@ -331,6 +332,52 @@ app.post('/signUp', async(req ,res)=>{
     if(password.length > 128){
        return res.status(400).json({err:"your password should be at 128 charactors at most!"})
     }
+    ////////////////////////////////////////////
+    //username validation
+    if(!Object.hasOwn(req.body, "userName")){
+      return res.status(400).json({err: "you must enter a username"})
+    }
+
+    if(typeof userName !== "string"){
+      return res.status(400).json({err: "invalid data type : you must enter a string for username"})
+    }
+
+    if(userName.trim().length === 0 ){
+      return res.status(400).json({err: "invalid input : you must enter a username"})
+    }
+
+    if(userName.length < 3){
+      return res.status(400).json({err: "you must enter at least 3 characters!"})
+    }
+
+    if(userName.length > 30){
+      return res.status(400).json({err: "you can not enter more than 30 characters!"})
+    }
+
+    if(userName[0] === "." ||userName[0]=== "-"|| userName[0] ==="_"){
+        return res.status(400).json({err: "your user name should start with a letter or a number"})
+      }
+
+    if(/[a-zA-Z]/.test(userName) === false){
+      return res.status(400).json({err:"your username should at least include one character"})
+    }
+    
+    if(/[^a-zA-Z0-9._-]/.test(userName)){
+        return res.status(400).json({err: "invalid character: your username could contain alphabets , 0-9 ,-,.,_"})
+      }
+
+
+        for(let i=1; i < userName.length; i++){
+          if((userName[i] === "." || userName[i] === "-" || userName[i] === "_") && (userName[i-1] === "." || userName[i-1] === "-" || userName[i-1] === "_")){
+              
+           return res.status(400).json({err: "invalid input: consecutive special characters are not allowed"})
+        }
+      }
+
+      if(userName[(userName.length)-1] === "." ||userName[(userName.length)-1]=== "-"|| userName[(userName.length)-1] ==="_"){
+        return res.status(400).json({err: "your user name should end with a letter or a number"})
+      }
+     
     ////////////////////////////////////////////
    
   try {
@@ -359,16 +406,46 @@ app.post('/signUp', async(req ,res)=>{
 
 //log In 
 app.post("/logIn", async (req, res)=>{
-const logIn_userName = req.body.userName;
-const logIn_password = req.body.password;
+if(typeof req.body  !== 'object' || req.body === null || Array.isArray(req.body) ){
+  return res.status(400).json({err: "your req.body must be an object"})
+}
 
 try {
+const logIn_userName = req.body.userName;
+const logIn_password = req.body.password;
+  ///////////////////////
+//password validation 
+    if(!Object.hasOwn(req.body, "password")){
+       return res.status(400).json({err:"you must enter a password!"})
+    }
+    if (typeof logIn_password !== "string"){
+       return res.status(400).json({err:"invalid data type: you must enter a string for password"})
+    }
+
+    if(logIn_password.trim().length === 0){
+       return res.status(400).json({err:"invalid input: you must enter a password"})
+    }
+///////////////////////
+
+//username validation
+if(!Object.hasOwn(req.body, "userName")){
+      return res.status(400).json({err: "you must enter a username"})
+    }
+
+    if(typeof logIn_userName !== "string"){
+      return res.status(400).json({err: "invalid data type : you must enter a string for username"})
+    }
+
+    if(logIn_userName.trim().length === 0 ){
+      return res.status(400).json({err: "invalid input : you must enter a username"})
+    }
+ ////////////////////////
 
   let result = await db.query ("SELECT id, password_hashed FROM users WHERE user_name = $1",
   [logIn_userName])
 
   if(result.rows[0] === undefined){
-    return res.status(400).json({err: "there is no such a username, register first!"})
+    return res.status(401).json({err: "invalid username or password!"})
   }
 
      const comparision = await bcrypt.compare(logIn_password, result.rows[0].password_hashed)
@@ -385,7 +462,7 @@ try {
 
      }
      else{
-      res.status(400).json({err: "wrong password"})
+      res.status(401).json({err: "invalid username or password"})
      }
 
 } catch (error) {
